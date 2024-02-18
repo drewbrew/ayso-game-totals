@@ -1,5 +1,6 @@
 """Load all the ref data and output a CSV of official info"""
 
+import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
@@ -21,7 +22,6 @@ def load_games(game_path: Path = BASE_DIR) -> dict[str, dict[str, Any]]:
     users = {}
     game_levels = {}
     for game_file in game_path.glob("games*.json"):
-        print(game_file)
         try:
             game_data = json.loads(game_file.read_text())
         except json.JSONDecodeError:
@@ -131,13 +131,56 @@ def basic_score(user_totals: RegularSeasonOrTourneyType) -> int:
     return total
 
 
+def division_boost_score(user_totals: RegularSeasonOrTourneyType) -> int:
+    total = 0
+    base_score = {
+        "07U": 1,
+        "08U": 1,
+        "09U": 2,
+        "10U": 2,
+        "12U": 3,
+        "14U": 4,
+        "15U": 5,
+        "16U": 5,
+        "18U": 6,
+        "19U": 6,
+    }
+    for event_totals in user_totals.values():
+        for division, role_totals in event_totals.items():
+            base = base_score[division[:3]]
+            for role_count in role_totals.values():
+                total += role_count * base
+    return total
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter
+    )
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument(
+        "--basic",
+        action="store_true",
+        help="One point per game scored, regardless of role or division",
+    )
+    group.add_argument(
+        "--division-boost-only",
+        action="store_true",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.)",
+    )
+    return parser.parse_args()
+
+
 def main():
+    args = parse_args()
     games = load_games()
     totals = assemble_totals(games=games)
-    basic_scores = {
-        user: basic_score(user_totals) for user, user_totals in totals.items()
-    }
-    for user, score in sorted(basic_scores.items(), key=lambda k: k[1], reverse=True):
+    if args.basic:
+        score_func = basic_score
+    elif args.division_boost_only:
+        score_func = division_boost_score
+    scores = {user: score_func(user_totals) for user, user_totals in totals.items()}
+    for user, score in sorted(scores.items(), key=lambda k: k[1], reverse=True):
         print(f"{user}: {score}")
 
 
