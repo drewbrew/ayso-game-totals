@@ -153,6 +153,29 @@ def division_boost_score(user_totals: RegularSeasonOrTourneyType) -> int:
     return total
 
 
+def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> int:
+    total = 0
+    base_score = {
+        "07U": 1,
+        "08U": 1,
+        "09U": 2,
+        "10U": 2,
+        "12U": 3,
+        "14U": 4,
+        "15U": 5,
+        "16U": 5,
+        "18U": 6,
+        "19U": 6,
+    }
+    for event_totals in user_totals.values():
+        for division, role_totals in event_totals.items():
+            base = base_score[division[:3]]
+            for role, role_count in role_totals.items():
+                role_modifier = 2 if role == "CR" else 1
+                total += role_count * base * role_modifier
+    return total
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -168,6 +191,11 @@ def parse_args():
         action="store_true",
         help="+1 point per increase in age group (8U - 1, 10U - 2, etc.)",
     )
+    group.add_argument(
+        "--division-and-role-boost",
+        action="store_true",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counds double for CR",
+    )
     return parser.parse_args()
 
 
@@ -179,6 +207,8 @@ def main():
         score_func = basic_score
     elif args.division_boost_only:
         score_func = division_boost_score
+    elif args.division_and_role_boost:
+        score_func = division_and_role_boost_score
     scores = {user: score_func(user_totals) for user, user_totals in totals.items()}
     for user, score in sorted(scores.items(), key=lambda k: k[1], reverse=True):
         print(f"{user}: {score}")
