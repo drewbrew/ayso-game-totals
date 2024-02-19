@@ -1,4 +1,27 @@
-"""Load all the ref data and output a CSV of official info"""
+"""Load all the ref data and output a CSV of official info
+
+To use this script:
+
+1.  Log in to stack officials as a referee
+2.  In your browser, open the dev tools (usually the F12 key)
+3.  Go to the network tab of the dev tools
+4.  Type games?page in the filter box to only get the queries for listing games
+5.  Go to the games tab in the nav bar
+6.  Select the event (e.g. AYSO 5C)
+7.  Wait for the page to load. You should see two new queries in the network requests,
+    one with a status code of 204 (No Content) and one of 200 (OK). Right-click on the
+    one that has the 200 response and choose Copy -> Copy Response
+8.  Paste that data into a text file and save it in this directory as games1.json
+9.  Repeat for each additional page.
+10. Run this script: python load_data.py --help
+11. Select your mode or just dump it to a CSV using the various switches
+    presented to you (replacing --help with --basic, for example)
+
+
+All data is parsed as it is entered in AYSO Area 5C (North Alabama); your
+particular administrator may enter things differently, at which point things
+are pretty much guaranteed to implode. Good luck!
+"""
 
 import argparse
 import json
