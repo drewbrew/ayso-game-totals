@@ -3,6 +3,7 @@
 import argparse
 import json
 from collections import defaultdict
+from csv import DictWriter
 from pathlib import Path
 from typing import Any
 
@@ -176,6 +177,93 @@ def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> in
     return total
 
 
+def division_tourney_and_role_boost_score(
+    user_totals: RegularSeasonOrTourneyType,
+) -> int:
+    total = 0
+    base_score = {
+        "07U": 1,
+        "08U": 1,
+        "09U": 2,
+        "10U": 2,
+        "12U": 3,
+        "14U": 4,
+        "15U": 5,
+        "16U": 5,
+        "18U": 6,
+        "19U": 6,
+    }
+    for season_type, event_totals in user_totals.items():
+        tournament_mod = 2 if season_type == "Tournament" else 1
+        for division, role_totals in event_totals.items():
+            base = base_score[division[:3]]
+            for role, role_count in role_totals.items():
+                role_modifier = 2 if role == "CR" else 1
+                total += role_count * base * role_modifier * tournament_mod
+    return total
+
+
+def format_user_totals_for_spreadsheet(
+    user: str,
+    totals: RegularSeasonOrTourneyType,
+    headers: list[str],
+) -> list[dict[str, int | str]]:
+    base_result = {
+        "Name": user,
+        "Basic score (1 per game)": basic_score(totals),
+        "+1 point per age group": division_boost_score(totals),
+        "+1 point per age group * 2 points for centering": division_and_role_boost_score(
+            totals
+        ),
+        "+1 point per age group * 2 points for centering * 2 for tournament": division_tourney_and_role_boost_score(
+            totals
+        ),
+    }
+    base_result |= {header: 0 for header in headers if header not in base_result}
+    for season_type, season_totals in totals.items():
+        for division, division_totals in sorted(season_totals.items()):
+            for role, role_total in division_totals.items():
+                base_result[f"{season_type} {division} {role}"] = role_total
+    return base_result
+
+
+def get_headers_for_spreadsheet(overall_totals: UserTotalsType) -> list[str]:
+    base_result = [
+        "Name",
+        "Basic score (1 per game)",
+        "+1 point per age group",
+        "+1 point per age group * 2 points for centering",
+        "+1 point per age group * 2 points for centering * 2 for tournament",
+    ]
+    extra_roles = set()
+    for totals in overall_totals.values():
+        for season_type, season_totals in totals.items():
+            for division, division_totals in sorted(season_totals.items()):
+                for role in division_totals:
+                    extra_roles.add(f"{season_type} {division} {role}")
+    base_result += sorted(extra_roles)
+    return base_result
+
+
+def dump_to_csv(user_totals: UserTotalsType, csv_path: str):
+    headers = get_headers_for_spreadsheet(user_totals)
+    user_dict = [
+        format_user_totals_for_spreadsheet(
+            headers=headers,
+            totals=totals,
+            user=user,
+        )
+        for user, totals in user_totals.items()
+    ]
+    with open(csv_path, "w") as csvfile:
+        writer = DictWriter(
+            csvfile,
+            fieldnames=user_dict[0].keys(),
+        )
+        writer.writeheader()
+        writer.writerows(sorted(user_dict, key=lambda k: k["Name"]))
+
+
 def parse_args():
     parser = argparse.ArgumentParser(
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -194,7 +282,18 @@ def parse_args():
     group.add_argument(
         "--division-and-role-boost",
         action="store_true",
-        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counds double for CR",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for CR",
+    )
+    group.add_argument(
+        "--division-tournament-and-role-boost",
+        action="store_true",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for CR and double for tournament",
+    )
+    group.add_argument(
+        "--dump-all-modes-to-csv",
+        type=str,
+        help="Dump all score modes to a CSV for comparison",
+        metavar="CSV_FILE",
     )
     return parser.parse_args()
 
@@ -203,12 +302,18 @@ def main():
     args = parse_args()
     games = load_games()
     totals = assemble_totals(games=games)
+    if args.dump_all_modes_to_csv:
+        dump_to_csv(totals, args.dump_all_modes_to_csv)
+        print(f"Saved to {args.dump_all_modes_to_csv}")
+        return
     if args.basic:
         score_func = basic_score
     elif args.division_boost_only:
         score_func = division_boost_score
     elif args.division_and_role_boost:
         score_func = division_and_role_boost_score
+    elif args.division_tournament_and_role_boost:
+        score_func = division_tourney_and_role_boost_score
     scores = {user: score_func(user_totals) for user, user_totals in totals.items()}
     for user, score in sorted(scores.items(), key=lambda k: k[1], reverse=True):
         print(f"{user}: {score}")
