@@ -25,6 +25,7 @@ are pretty much guaranteed to implode. Good luck!
 
 import argparse
 import json
+import datetime
 from collections import defaultdict
 from csv import DictWriter
 from pathlib import Path
@@ -137,7 +138,7 @@ def assemble_totals(
     for game in games.values():
         if not game.get("refs"):
             continue
-        division = game["division"]
+        division = convert_raw_division_to_age_group(game["division"])[:3]
         season_type = "Tournament" if game["is_tournament"] else "Regular Season"
         for ref in game["refs"]:
             name = " ".join(i.strip() for i in (ref["first_name"], ref["last_name"]))
@@ -171,10 +172,29 @@ def division_boost_score(user_totals: RegularSeasonOrTourneyType) -> int:
     }
     for event_totals in user_totals.values():
         for division, role_totals in event_totals.items():
+            division = convert_raw_division_to_age_group(division)
             base = base_score[division[:3]]
             for role_count in role_totals.values():
                 total += role_count * base
     return total
+
+
+def convert_raw_division_to_age_group(division: str) -> str:
+    if "U" not in division[:3]:
+        try:
+            year = int(division[:4])
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Unable to parse division {division}") from exc
+        now = datetime.datetime.now(tz=datetime.UTC)
+        # hACK: guess based on the year
+        # TLDR: if it's spring, we can safely subtract the year
+        # but if it's fall, we need to add one
+        # IOW, if it's spring 2024, 2014 = 10U and 2012 = 12U
+        delta = now.year - year
+        if now.month >= 8:
+            delta += 1
+        return f"{delta:0>2}U"
+    return division
 
 
 def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> int:
@@ -193,6 +213,7 @@ def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> in
     }
     for event_totals in user_totals.values():
         for division, role_totals in event_totals.items():
+            division = convert_raw_division_to_age_group(division)
             base = base_score[division[:3]]
             for role, role_count in role_totals.items():
                 role_modifier = 2 if role == "CR" else 1
@@ -219,6 +240,7 @@ def division_tourney_and_role_boost_score(
     for season_type, event_totals in user_totals.items():
         tournament_mod = 2 if season_type == "Tournament" else 1
         for division, role_totals in event_totals.items():
+            division = convert_raw_division_to_age_group(division)
             base = base_score[division[:3]]
             for role, role_count in role_totals.items():
                 role_modifier = 2 if role == "CR" else 1
@@ -245,6 +267,7 @@ def format_user_totals_for_spreadsheet(
     base_result |= {header: 0 for header in headers if header not in base_result}
     for season_type, season_totals in totals.items():
         for division, division_totals in sorted(season_totals.items()):
+            division = convert_raw_division_to_age_group(division)
             for role, role_total in division_totals.items():
                 base_result[f"{season_type} {division} {role}"] = role_total
     return base_result
@@ -262,6 +285,7 @@ def get_headers_for_spreadsheet(overall_totals: UserTotalsType) -> list[str]:
     for totals in overall_totals.values():
         for season_type, season_totals in totals.items():
             for division, division_totals in sorted(season_totals.items()):
+                division = convert_raw_division_to_age_group(division)
                 for role in division_totals:
                     extra_roles.add(f"{season_type} {division} {role}")
     base_result += sorted(extra_roles)
