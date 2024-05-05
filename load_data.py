@@ -216,9 +216,14 @@ def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> in
             division = convert_raw_division_to_age_group(division)
             base = base_score[division[:3]]
             for role, role_count in role_totals.items():
-                role_modifier = 2 if role == "CR" else 1
+                role_modifier = 2 if is_referee(role) else 1
                 total += role_count * base * role_modifier
     return total
+
+
+def is_referee(role: str) -> bool:
+    """Is the role a referee (rather than AR or 4th official)"""
+    return role in {"CR", "Referee"}
 
 
 def division_tourney_and_role_boost_score(
@@ -243,7 +248,7 @@ def division_tourney_and_role_boost_score(
             division = convert_raw_division_to_age_group(division)
             base = base_score[division[:3]]
             for role, role_count in role_totals.items():
-                role_modifier = 2 if role == "CR" else 1
+                role_modifier = 2 if is_referee(role) else 1
                 total += role_count * base * role_modifier * tournament_mod
     return total
 
@@ -329,12 +334,12 @@ def parse_args():
     group.add_argument(
         "--division-and-role-boost",
         action="store_true",
-        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for CR",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for Referee",
     )
     group.add_argument(
         "--division-tournament-and-role-boost",
         action="store_true",
-        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for CR and double for tournament",
+        help="+1 point per increase in age group (8U - 1, 10U - 2, etc.), counts double for Referee and double for tournament",
     )
     group.add_argument(
         "--dump-all-modes-to-csv",
