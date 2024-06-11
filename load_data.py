@@ -24,6 +24,7 @@ are pretty much guaranteed to implode. Good luck!
 """
 
 import argparse
+from decimal import Decimal
 import json
 import datetime
 from collections import defaultdict
@@ -38,6 +39,20 @@ RoleType = dict[str, int]
 LevelType = dict[str, RoleType]
 RegularSeasonOrTourneyType = dict[str, LevelType]
 UserTotalsType = dict[str, RegularSeasonOrTourneyType]
+
+
+GAME_MINUTES = {
+    "07U": Decimal(40),
+    "08U": Decimal(40),
+    "09U": Decimal(50),
+    "10U": Decimal(50),
+    "12U": Decimal(60),
+    "14U": Decimal(70),
+    "15U": Decimal(80),
+    "16U": Decimal(80),
+    "18U": Decimal(90),
+    "19U": Decimal(90),
+}
 
 
 def load_games(game_path: Path = BASE_DIR) -> dict[str, dict[str, Any]]:
@@ -145,6 +160,29 @@ def assemble_totals(
             role = ref["role"]
             totals[name][season_type][division][role] += 1
     return totals
+
+
+def get_minutes(totals: UserTotalsType) -> Decimal:
+    """Extract how many minutes a referee spent on the pitch
+
+    R = 100%
+    AR = 50%
+    other roles = 25%
+    """
+    result = 0
+
+    for event_dict in totals.values():
+        for division_label, division_dict in event_dict.items():
+            print(f"{division_label=}, {division_dict=}")
+            minutes_per_game = GAME_MINUTES[division_label]
+            for role, game_count in division_dict.items():
+                if is_referee(role):
+                    result += minutes_per_game * game_count
+                elif "AR" in role:
+                    result += minutes_per_game * game_count / 2
+                else:
+                    result += minutes_per_game * game_count / 4
+    return result
 
 
 def basic_score(user_totals: RegularSeasonOrTourneyType) -> int:
@@ -256,10 +294,12 @@ def division_tourney_and_role_boost_score(
 def format_user_totals_for_spreadsheet(
     user: str,
     totals: RegularSeasonOrTourneyType,
+    minutes: Decimal,
     headers: list[str],
 ) -> list[dict[str, int | str]]:
     base_result = {
         "Name": user,
+        "Total minutes": round(minutes, 1),
         "Basic score (1 per game)": basic_score(totals),
         "+1 point per age group": division_boost_score(totals),
         "+1 point per age group * 2 points for centering": division_and_role_boost_score(
@@ -304,6 +344,7 @@ def dump_to_csv(user_totals: UserTotalsType, csv_path: str):
             headers=headers,
             totals=totals,
             user=user,
+            minutes=get_minutes(totals=totals),
         )
         for user, totals in user_totals.items()
     ]
