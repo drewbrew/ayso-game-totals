@@ -166,23 +166,22 @@ def get_minutes(totals: UserTotalsType) -> Decimal:
     """Extract how many minutes a referee spent on the pitch
 
     R = 100%
-    AR = 50%
-    other roles = 25%
+    AR = 80%
+    other roles = 75%
     """
     result = 0
 
     for event_dict in totals.values():
         for division_label, division_dict in event_dict.items():
-            print(f"{division_label=}, {division_dict=}")
             minutes_per_game = GAME_MINUTES[division_label]
             for role, game_count in division_dict.items():
                 if is_referee(role):
                     result += minutes_per_game * game_count
                 elif "AR" in role:
-                    result += minutes_per_game * game_count / 2
+                    result += minutes_per_game * game_count * 4 / 5
                 else:
-                    result += minutes_per_game * game_count / 4
-    return result
+                    result += minutes_per_game * game_count * 3 / 4
+    return round(result)
 
 
 def basic_score(user_totals: RegularSeasonOrTourneyType) -> int:
