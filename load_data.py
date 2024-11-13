@@ -353,7 +353,7 @@ def dump_to_csv(user_totals: UserTotalsType, csv_path: str):
             fieldnames=user_dict[0].keys(),
         )
         writer.writeheader()
-        writer.writerows(sorted(user_dict, key=lambda k: k["Name"]))
+        writer.writerows(sorted(user_dict, key=lambda k: k["Name"].casefold()))
 
 
 def parse_args():
