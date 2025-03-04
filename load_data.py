@@ -323,11 +323,11 @@ def format_user_totals_for_spreadsheet(
         "Name": user,
         "Total minutes": round(minutes, 1),
         "Basic score (1 per game)": basic_score(totals),
-        "+1 point per age group": division_boost_score(totals),
-        "+1 point per age group * 2 points for centering": division_and_role_boost_score(
+        "Add 1 point per age group": division_boost_score(totals),
+        "Add 1 point per age group * 2 points for centering": division_and_role_boost_score(
             totals
         ),
-        "+1 point per age group * 2 points for centering * 2 for tournament": division_tourney_and_role_boost_score(
+        "Add 1 point per age group * 2 points for centering * 2 for tournament": division_tourney_and_role_boost_score(
             totals
         ),
     }
@@ -344,9 +344,9 @@ def get_headers_for_spreadsheet(overall_totals: UserTotalsType) -> list[str]:
     base_result = [
         "Name",
         "Basic score (1 per game)",
-        "+1 point per age group",
-        "+1 point per age group * 2 points for centering",
-        "+1 point per age group * 2 points for centering * 2 for tournament",
+        "Add 1 point per age group",
+        "Add 1 point per age group * 2 points for centering",
+        "Add 1 point per age group * 2 points for centering * 2 for tournament",
     ]
     extra_roles = set()
     for totals in overall_totals.values():
