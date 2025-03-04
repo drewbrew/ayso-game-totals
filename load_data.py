@@ -54,6 +54,21 @@ GAME_MINUTES = {
     "19U": Decimal(90),
 }
 
+FUTSAL_MINUTES = {
+    "07U": Decimal(40),
+    "08U": Decimal(40),
+    "09U": Decimal(50),
+    "10U": Decimal(50),
+    "12U": Decimal(50),
+    "14U": Decimal(50),
+    # technically these games are only 50 mins, but we're artificially inflating the
+    # count to reward higher games
+    "15U": Decimal(60),
+    "16U": Decimal(60),
+    "18U": Decimal(60),
+    "19U": Decimal(70),
+}
+
 
 def load_games(game_path: Path = BASE_DIR) -> dict[str, dict[str, Any]]:
     games = {}
@@ -101,6 +116,9 @@ def load_games(game_path: Path = BASE_DIR) -> dict[str, dict[str, Any]]:
         game["division"] = division
         is_tournament = (
             "tourney" in game_level["attributes"]["schedule_name"].casefold()
+        )
+        game["is_futsal"] = (
+            "futsal" in game_level["attributes"]["schedule_name"].casefold()
         )
         game["is_tournament"] = is_tournament
         for assignment_id in assignment_ids:
@@ -155,6 +173,8 @@ def assemble_totals(
             continue
         division = convert_raw_division_to_age_group(game["division"])[:3]
         season_type = "Tournament" if game["is_tournament"] else "Regular Season"
+        if game["is_futsal"]:
+            season_type = f"Futsal {season_type}"
         for ref in game["refs"]:
             name = " ".join(i.strip() for i in (ref["first_name"], ref["last_name"]))
             role = ref["role"]
@@ -171,9 +191,12 @@ def get_minutes(totals: UserTotalsType) -> Decimal:
     """
     result = 0
 
-    for event_dict in totals.values():
+    for season_name, event_dict in totals.items():
         for division_label, division_dict in event_dict.items():
-            minutes_per_game = GAME_MINUTES[division_label]
+            if "futsal" in season_name.casefold():
+                minutes_per_game = FUTSAL_MINUTES[division_label]
+            else:
+                minutes_per_game = GAME_MINUTES[division_label]
             for role, game_count in division_dict.items():
                 if is_referee(role):
                     result += minutes_per_game * game_count
@@ -260,7 +283,7 @@ def division_and_role_boost_score(user_totals: RegularSeasonOrTourneyType) -> in
 
 def is_referee(role: str) -> bool:
     """Is the role a referee (rather than AR or 4th official)"""
-    return role in {"CR", "Referee"}
+    return role in {"CR", "Referee", "Referee 1", "Referee 2"}
 
 
 def division_tourney_and_role_boost_score(
