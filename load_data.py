@@ -378,6 +378,42 @@ def dump_to_csv(user_totals: UserTotalsType, csv_path: str):
         writer.writeheader()
         writer.writerows(sorted(user_dict, key=lambda k: k["Name"].casefold()))
 
+def coverage_stats(games: dict[str, dict[str, Any]]) -> None:
+    totals = {
+        division: {
+            'no refs': 0,
+            'referee only': 0,
+            '1 AR': 0,
+            'full crew': 0,
+        }
+        for division in ['08U', '09U', '10U', '12U', '15U', '19U']
+    }
+    for game in games.values():
+        print(json.dumps(game, indent=2))
+        try:
+            division = convert_raw_division_to_age_group(game["division"])[:3]
+        except KeyError:
+            division = convert_raw_division_to_age_group(game['attributes']["division"]['name'])[:3]
+        if refs := game.get('refs'):
+            ref_count = len(refs)
+            if ref_count == 1:
+                totals[division]['referee only'] += 1
+            elif ref_count == 2:
+                totals[division]['1 AR'] += 1
+            elif ref_count >= 3:
+                totals[division]['full crew'] += 1
+            else:
+                raise ValueError(f'Unknown ref count {ref_count}')
+        else:
+            totals[division]['no refs'] += 1
+    print('<ul>')
+    for division, division_stats in totals.items():
+        print(f'<li>{division}\n<ul>')
+        for ref_type, count in division_stats.items():
+            print(f'<li>{ref_type}: {count}</li>')
+        print('</ul></li>')
+    print('</ul>')
+
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -410,6 +446,11 @@ def parse_args():
         help="Dump all score modes to a CSV for comparison",
         metavar="CSV_FILE",
     )
+    group.add_argument(
+        '--coverage-stats',
+        action='store_true',
+        help='Print game coverage statistics',
+    )
     return parser.parse_args()
 
 
@@ -421,6 +462,8 @@ def main():
         dump_to_csv(totals, args.dump_all_modes_to_csv)
         print(f"Saved to {args.dump_all_modes_to_csv}")
         return
+    if args.coverage_stats:
+        return coverage_stats(games)
     if args.basic:
         score_func = basic_score
     elif args.division_boost_only:
